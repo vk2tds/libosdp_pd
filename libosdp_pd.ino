@@ -16,7 +16,7 @@ HardwareSerial &debugSerial = Serial;
 
 
 
-keystore_file = "/tmp/pd_scbk"
+//keystore_file = "/tmp/pd_scbk"
 
 //def store_scbk(key):
 //    with open(keystore_file, "w") as f:
@@ -72,12 +72,13 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
 
   switch (cmd->id){
     CMD_KEYSET:
-      if (cmd->type == 1){
+      if (cmd->keyset.type == 1){
         // store cmd->data;
       }
       break;
     CMD_OUTPUT:
-
+      //cmd->output.output_no, // 0 = first output
+      //cmd->output.control_code, // 1 = Off. 2 = On. See osdp.h for other values. e.g. Timed Values
       break;
 
     

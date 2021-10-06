@@ -41,8 +41,6 @@ HardwareSerial &debugSerial = Serial;
 
 int sample_pd_send_func(void *data, uint8_t *buf, int len)
 {
-  //(void)(data);
-  (void)(buf);
   //PTT On
   // TODO: Should be data.write etc.
   rs485Serial.write (buf, len);
@@ -54,13 +52,17 @@ int sample_pd_send_func(void *data, uint8_t *buf, int len)
 
 int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 {
-  (void)(data);
-  (void)(buf);
-  (void)(len);
 
-  // Fill these
+  int index = 0;
+  while (rs485Serial.available()){
+    buf[index] = rs485Serial.read();
+    index++;
+    if (index >= len)
+      break;
+  }
+  return index;
+  // how do we share this between two PD Contexts? Do we grab the data and make sure it is sent to both? Is it shared internally?
 
-  return 0;
 }
 
 int pd_command_handler(void *self, struct osdp_cmd *cmd)
@@ -80,6 +82,12 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
       //cmd->output.output_no, // 0 = first output
       //cmd->output.control_code, // 1 = Off. 2 = On. See osdp.h for other values. e.g. Timed Values
       break;
+    CMD_LSTAT:
+      // Outputs I think. 
+      // Reply with REPLY_LSTATR
+      // [0] = Tamper; [1] = Power; ???
+      break;
+    // CMD_POLL will not come here I think as this is for things like readers etc. 
 
     
   }
@@ -92,7 +100,7 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
 osdp_pd_info_t info_pd = {
   .baud_rate = 115200, // Ignored
   .address = 101,
-  .flags = 0,
+  .flags = 0, // such as OSDP_FLAG_INSTALL_MODE etc. 
   .id = {
     .version = 1,
     .model = 153,
@@ -114,6 +122,12 @@ osdp_pd_info_t info_pd = {
     {
       .function_code = OSDP_PD_CAP_OUTPUT_CONTROL,
       .compliance_level = 1,
+      .num_items = 1
+    },
+    {
+      .function_code = SDP_PD_CAP_COMMUNICATION_SECURITY,
+      .compliance_level = 0, // Try 1 later
+      // more doc/libosdp/secure-channel.rst
       .num_items = 1
     },
     {

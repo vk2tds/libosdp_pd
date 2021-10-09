@@ -6,13 +6,21 @@
 
 #define OSDP_EXPORT
 #define OSDP_NO_EXPORT
+#define CONFIG_OSDP_PACKET_TRACE TRUE
 
 //#include <iostream>
 #include <unistd.h>
 #include <osdp.hpp>
 
-HardwareSerial &rs485Serial = Serial;
-HardwareSerial &debugSerial = Serial;
+
+
+
+//HardwareSerial debugSerial = Serial; // (PA3, PA3);
+HardwareSerial Serial1 (PA10, PA9); // (PA10, PA9); // D2, D8, Rx, Tx
+
+
+#define RS485_PTT_PIN PB3 // D3
+
 
 
 
@@ -41,11 +49,16 @@ HardwareSerial &debugSerial = Serial;
 
 int sample_pd_send_func(void *data, uint8_t *buf, int len)
 {
-  //PTT On
-  // TODO: Should be data.write etc.
-  rs485Serial.write (buf, len);
-  rs485Serial.flush();
-  //PTT Off
+  static int state = LOW;
+  digitalWrite(LED_BUILTIN, state);
+  state = !state;
+  digitalWrite (RS485_PTT_PIN, HIGH);
+  Serial1.write (buf, len);
+  Serial1.flush();
+  Serial1.flush();
+  ////delay(1);
+  digitalWrite (RS485_PTT_PIN, LOW);
+  //digitalWrite(LED_BUILTIN, LOW);  
 
   return len;
 }
@@ -54,11 +67,14 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 {
 
   int index = 0;
-  while (rs485Serial.available()){
-    buf[index] = rs485Serial.read();
+  while (Serial1.available()){
+    buf[index] = Serial1.read();
+    //Serial.println (buf[index]);
     index++;
     if (index >= len)
       break;
+    //if (index > 5)
+    //  break; // vk2tds hack to break up packets
   }
   return index;
   // how do we share this between two PD Contexts? Do we grab the data and make sure it is sent to both? Is it shared internally?
@@ -67,12 +83,13 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 
 int pd_command_handler(void *self, struct osdp_cmd *cmd)
 {
-  (void)(self);
-
   Serial.print ("PD: CMD ");
   Serial.println (cmd->id);
-
+  //Serial.flush();
+  
   switch (cmd->id){
+    CMD_MFG:
+      return -1; // We dont know any user defined commands
     CMD_KEYSET:
       if (cmd->keyset.type == 1){
         // store cmd->data;
@@ -99,19 +116,24 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
 
 osdp_pd_info_t info_pd = {
   .baud_rate = 115200, // Ignored
-  .address = 101,
-  .flags = 0, // such as OSDP_FLAG_INSTALL_MODE etc. 
+  .address = 100,
+  .flags = OSDP_FLAG_INSTALL_MODE, // Was 0.  such as OSDP_FLAG_INSTALL_MODE etc. 
   .id = {
-    .version = 1,
-    .model = 153,
-    .vendor_code = 31337,
-    .serial_number = 0x01020304,
-    .firmware_version = 0x0A0B0C0D,
+    .version = 2,
+    .model = 154,
+    .vendor_code = 31336,
+    .serial_number = 0x01020303,
+    .firmware_version = 0x0A0B0C0C,
   },
   .cap = (struct osdp_pd_cap []) {
     {
       .function_code = OSDP_PD_CAP_READER_LED_CONTROL,
       .compliance_level = 1,
+      .num_items = 1
+    },
+    {
+      .function_code = OSDP_PD_CAP_CARD_DATA_FORMAT,
+      .compliance_level = 2,
       .num_items = 1
     },
     {
@@ -125,10 +147,15 @@ osdp_pd_info_t info_pd = {
       .num_items = 1
     },
     {
-      .function_code = SDP_PD_CAP_COMMUNICATION_SECURITY,
-      .compliance_level = 0, // Try 1 later
-      // more doc/libosdp/secure-channel.rst
+      .function_code = OSDP_PD_CAP_READERS,
+      .compliance_level = 1,
       .num_items = 1
+    },
+    {
+      .function_code = OSDP_PD_CAP_COMMUNICATION_SECURITY,
+      .compliance_level = 1, // Try 1 later
+      // more doc/libosdp/secure-channel.rst
+      .num_items = 0
     },
     {
       .function_code = OSDP_PD_CAP_CONTACT_STATUS_MONITORING, // MAY NOT BE IMPLEMENTED...
@@ -139,7 +166,7 @@ osdp_pd_info_t info_pd = {
   },
   .channel = {
     .data = nullptr, // Ideally put a reference here to the rs485Serial
-    .id = 0,
+    .id = 0, // Not sure what this does
     .recv = sample_pd_recv_func,
     .send = sample_pd_send_func,
     .flush = nullptr // We need to flush before PTT stops so ignore this. 
@@ -154,12 +181,28 @@ osdp_pd_info_t info_pd = {
 
 
 void setup() {
-  rs485Serial.begin (115200);
-  debugSerial.begin (115200);
-  pd.logger_init(OSDP_LOG_DEBUG, printf);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode (RS485_PTT_PIN, OUTPUT);
+  digitalWrite (RS485_PTT_PIN, LOW);
+  
+  Serial1.begin (115200);
+  Serial.begin (115200);
+
+  randomSeed(analogRead(0));
+
+  Serial.println ("Welcomne to the Thunderdome...");
+  Serial.flush();
+  Serial1.println ("Welcome to the other Thunderdome...");
+  pd.logger_init(OSDP_LOG_MAX_LEVEL, printf);
 
   // info_pd.scbk = load from somewhere...
-  
+
+  info_pd.id.serial_number = random (1000000,9999999);
+  info_pd.id.model = random (100,199);
+  info_pd.id.vendor_code = random (1000000,9999999);
+
+  info_pd.address = random (5,16);
   pd.setup(&info_pd);
   pd.set_command_callback(pd_command_handler);
 
@@ -180,6 +223,6 @@ void loop() {
     //  }
 
     // your application code.
-    delay(1); // 1000 mSec
+    //delay(1); // 1000 mSec
 
 }

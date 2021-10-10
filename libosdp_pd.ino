@@ -83,7 +83,7 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 
 int pd_command_handler(void *self, struct osdp_cmd *cmd)
 {
-  Serial.print ("PD: CMD ");
+  Serial.print ("CALLBACK: PD: CMD ");
   Serial.println (cmd->id);
   //Serial.flush();
   
@@ -153,7 +153,7 @@ osdp_pd_info_t info_pd = {
     },
     {
       .function_code = OSDP_PD_CAP_COMMUNICATION_SECURITY,
-      .compliance_level = 1, // Try 1 later
+      .compliance_level = 0, // Try 1 later
       // more doc/libosdp/secure-channel.rst
       .num_items = 0
     },
@@ -202,7 +202,7 @@ void setup() {
   info_pd.id.model = random (100,199);
   info_pd.id.vendor_code = random (1000000,9999999);
 
-  info_pd.address = random (5,16);
+  info_pd.address = 1; //random (5,16);
   pd.setup(&info_pd);
   pd.set_command_callback(pd_command_handler);
 

@@ -73,8 +73,8 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
     index++;
     if (index >= len)
       break;
-    //if (index > 5)
-    //  break; // vk2tds hack to break up packets
+    if (index > 4)
+      break; // vk2tds hack to break up packets
   }
   return index;
   // how do we share this between two PD Contexts? Do we grab the data and make sure it is sent to both? Is it shared internally?
@@ -83,26 +83,33 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 
 int pd_command_handler(void *self, struct osdp_cmd *cmd)
 {
-  Serial.print ("CALLBACK: PD: CMD ");
-  Serial.println (cmd->id);
+ //Serial.print ("CALLBACK: PD: CMD ");
+  //Serial.println (cmd->id);
   //Serial.flush();
   
   switch (cmd->id){
-    CMD_MFG:
+    case OSDP_CMD_MFG:
+      //Serial.println ("MFG");
       return -1; // We dont know any user defined commands
-    CMD_KEYSET:
+      break;
+    case OSDP_CMD_KEYSET:
       if (cmd->keyset.type == 1){
         // store cmd->data;
       }
       break;
-    CMD_OUTPUT:
+    case OSDP_CMD_OUTPUT:
       //cmd->output.output_no, // 0 = first output
       //cmd->output.control_code, // 1 = Off. 2 = On. See osdp.h for other values. e.g. Timed Values
+      return 0;
       break;
-    CMD_LSTAT:
+    case OSDP_CMD_SENTINEL:
       // Outputs I think. 
       // Reply with REPLY_LSTATR
       // [0] = Tamper; [1] = Power; ???
+      return 0;
+      break;
+    case OSDP_CMD_BUZZER:
+      return 0;
       break;
     // CMD_POLL will not come here I think as this is for things like readers etc. 
 
@@ -153,15 +160,15 @@ osdp_pd_info_t info_pd = {
     },
     {
       .function_code = OSDP_PD_CAP_COMMUNICATION_SECURITY,
-      .compliance_level = 0, // Try 1 later
+      .compliance_level = 1, // Try 1 later
       // more doc/libosdp/secure-channel.rst
       .num_items = 0
     },
-    {
-      .function_code = OSDP_PD_CAP_CONTACT_STATUS_MONITORING, // MAY NOT BE IMPLEMENTED...
-      .compliance_level = 1,
-      .num_items = 1
-    },
+//    {
+//      .function_code = OSDP_PD_CAP_CONTACT_STATUS_MONITORING, // MAY NOT BE IMPLEMENTED...
+//      .compliance_level = 1,
+//      .num_items = 1
+//    },
     { static_cast<uint8_t>(-1), 0, 0 } /* Sentinel */
   },
   .channel = {

@@ -53,6 +53,7 @@ int sample_pd_send_func(void *data, uint8_t *buf, int len)
   digitalWrite(LED_BUILTIN, state);
   state = !state;
   digitalWrite (RS485_PTT_PIN, HIGH);
+  delayMicroseconds(200);
   Serial1.write (buf, len);
   Serial1.flush();
   Serial1.flush();
@@ -90,7 +91,7 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
   switch (cmd->id){
     case OSDP_CMD_MFG:
       //Serial.println ("MFG");
-      return -1; // We dont know any user defined commands
+      return -9; // We dont know any user defined commands
       break;
     case OSDP_CMD_KEYSET:
       if (cmd->keyset.type == 1){
@@ -109,6 +110,7 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
       return 0;
       break;
     case OSDP_CMD_BUZZER:
+      Serial.println("Buz!");
       return 0;
       break;
     // CMD_POLL will not come here I think as this is for things like readers etc. 
@@ -143,11 +145,11 @@ osdp_pd_info_t info_pd = {
       .compliance_level = 2,
       .num_items = 1
     },
-    {
-      .function_code = OSDP_PD_CAP_READER_AUDIBLE_OUTPUT,
-      .compliance_level = 1,
-      .num_items = 1
-    },
+    //{
+    //  .function_code = OSDP_PD_CAP_READER_AUDIBLE_OUTPUT,
+    //  .compliance_level = 1,
+    //  .num_items = 1
+    //},
     {
       .function_code = OSDP_PD_CAP_OUTPUT_CONTROL,
       .compliance_level = 1,
@@ -164,6 +166,11 @@ osdp_pd_info_t info_pd = {
       // more doc/libosdp/secure-channel.rst
       .num_items = 0
     },
+//    {
+//      .function_code = OSDP_PD_CAP_CHECK_CHARACTER_SUPPORT,
+//      .compliance_level = 1, 
+//      .num_items = 0
+//    },
 //    {
 //      .function_code = OSDP_PD_CAP_CONTACT_STATUS_MONITORING, // MAY NOT BE IMPLEMENTED...
 //      .compliance_level = 1,
@@ -200,14 +207,16 @@ void setup() {
 
   Serial.println ("Welcomne to the Thunderdome...");
   Serial.flush();
-  Serial1.println ("Welcome to the other Thunderdome...");
+  //Serial1.println ("Welcome to the other Thunderdome...");
   pd.logger_init(OSDP_LOG_MAX_LEVEL, printf);
 
   // info_pd.scbk = load from somewhere...
 
   info_pd.id.serial_number = random (1000000,9999999);
   info_pd.id.model = random (100,199);
+  info_pd.id.version = random (100,199);
   info_pd.id.vendor_code = random (1000000,9999999);
+  info_pd.id.firmware_version = random (1000000,9999999);
 
   info_pd.address = 1; //random (5,16);
   pd.setup(&info_pd);
@@ -218,15 +227,30 @@ void setup() {
 void loop() {
     pd.refresh();
 
+    if (random(1000000) == 1){
+      osdp_event oet = {
+        .type = OSDP_EVENT_CARDREAD,
+        .cardread = {
+          .reader_no = 1, // not used by lib
+          .length = 8,
+          //.data = 'ABCD1234',
+        },
+      };
+      oet.cardread.data[0] = 'A';
+      oet.cardread.data[0] = 'B';
+      oet.cardread.data[0] = 'C';
+      oet.cardread.data[0] = 'D';
+      oet.cardread.data[0] = '1';
+      oet.cardread.data[0] = '2';
+      oet.cardread.data[0] = '3';
+      oet.cardread.data[0] = '4';
+      
+       pd.notify_event (&oet);
+
+      
+    }
+
     //if (WIEGAND){
-    //  ospd_event_type oet = {
-    //    .type = OSDP_EVENT_CARDREAD,
-    //    .cardread = {
-    //      .reader_no = 1, \\ not used by lib
-    //      .length = 8,
-    //      .data = 'ABCD1234';
-    //    };
-    //   pd.notify_event (oet);
     //  }
 
     // your application code.

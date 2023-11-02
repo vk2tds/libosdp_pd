@@ -8,14 +8,12 @@
 #define OSDP_NO_EXPORT
 #define CONFIG_OSDP_PACKET_TRACE TRUE
 
-//#include <iostream>
 #include <unistd.h>
 #include <osdp.hpp>
 
 
 
 
-//HardwareSerial debugSerial = Serial; // (PA3, PA3);
 HardwareSerial Serial1 (PA10, PA9); // (PA10, PA9); // D2, D8, Rx, Tx
 
 
@@ -57,7 +55,7 @@ int sample_pd_send_func(void *data, uint8_t *buf, int len)
   Serial1.write (buf, len);
   Serial1.flush();
   Serial1.flush();
-  ////delay(1);
+  delayMicroseconds(200);
   digitalWrite (RS485_PTT_PIN, LOW);
   //digitalWrite(LED_BUILTIN, LOW);  
 
@@ -68,6 +66,7 @@ int sample_pd_recv_func(void *data, uint8_t *buf, int len)
 {
 
   int index = 0;
+  //Serial.println ("Data");
   while (Serial1.available()){
     buf[index] = Serial1.read();
     //Serial.println (buf[index]);
@@ -125,7 +124,7 @@ int pd_command_handler(void *self, struct osdp_cmd *cmd)
 
 osdp_pd_info_t info_pd = {
   .baud_rate = 115200, // Ignored
-  .address = 100,
+  .address = 0,
   .flags = OSDP_FLAG_INSTALL_MODE, // Was 0.  such as OSDP_FLAG_INSTALL_MODE etc. 
   .id = {
     .version = 2,
@@ -145,11 +144,11 @@ osdp_pd_info_t info_pd = {
       .compliance_level = 2,
       .num_items = 1
     },
-    //{
-    //  .function_code = OSDP_PD_CAP_READER_AUDIBLE_OUTPUT,
-    //  .compliance_level = 1,
-    //  .num_items = 1
-    //},
+    {
+      .function_code = OSDP_PD_CAP_READER_AUDIBLE_OUTPUT,
+      .compliance_level = 1,
+      .num_items = 1
+    },
     {
       .function_code = OSDP_PD_CAP_OUTPUT_CONTROL,
       .compliance_level = 1,
@@ -188,10 +187,41 @@ osdp_pd_info_t info_pd = {
   .scbk = nullptr,
 };
 
-
-
-
   OSDP::PeripheralDevice pd;
+
+
+
+
+void card(){
+      Serial.println ("Card Read");
+      osdp_event oet = {
+        .type = OSDP_EVENT_CARDREAD,
+        .cardread = {
+          .reader_no = 0, // not used by lib
+          .format = OSDP_CARD_FMT_RAW_WIEGAND, // ASCII???? or OSDP_CARD_FMT_ASCII
+          .length = 34, // Bits for Wiegand. InnerRange loves Wiegand
+          //.data = 'ABCD1234',
+        },
+      };
+      oet.cardread.data[0] = '1';
+      oet.cardread.data[1] = '2';
+      oet.cardread.data[2] = '3';
+      oet.cardread.data[3] = '4';
+      //oet.cardread.data[4] = '1';
+      //oet.cardread.data[5] = '2';
+      //oet.cardread.data[6] = '3';
+      //oet.cardread.data[7] = '4';
+      
+       pd.notify_event (&oet);
+
+      
+  
+}
+
+
+
+
+
 
 
 void setup() {
@@ -212,42 +242,38 @@ void setup() {
 
   // info_pd.scbk = load from somewhere...
 
-  info_pd.id.serial_number = random (1000000,9999999);
+  info_pd.id.serial_number = 74730; //random (1000000,9999999);
   info_pd.id.model = random (100,199);
   info_pd.id.version = random (100,199);
   info_pd.id.vendor_code = random (1000000,9999999);
   info_pd.id.firmware_version = random (1000000,9999999);
 
-  info_pd.address = 1; //random (5,16);
+  info_pd.address = 0; //random (5,16); // Also set above
   pd.setup(&info_pd);
   pd.set_command_callback(pd_command_handler);
 
+  pinMode (PC13, INPUT_PULLDOWN);
+
+
 }
 
+
+int pbState = 0;
 void loop() {
     pd.refresh();
 
-    if (random(1000000) == 1){
-      osdp_event oet = {
-        .type = OSDP_EVENT_CARDREAD,
-        .cardread = {
-          .reader_no = 1, // not used by lib
-          .length = 8,
-          //.data = 'ABCD1234',
-        },
-      };
-      oet.cardread.data[0] = 'A';
-      oet.cardread.data[0] = 'B';
-      oet.cardread.data[0] = 'C';
-      oet.cardread.data[0] = 'D';
-      oet.cardread.data[0] = '1';
-      oet.cardread.data[0] = '2';
-      oet.cardread.data[0] = '3';
-      oet.cardread.data[0] = '4';
-      
-       pd.notify_event (&oet);
+//    if (random(10000000) == 1){
+//      card();
+//    }
 
-      
+
+    int p = digitalRead (PC13);
+    if (p != pbState){
+        pbState = p;
+        Serial.println ("Push");
+        if (!pbState){
+          card();
+        }
     }
 
     //if (WIEGAND){
